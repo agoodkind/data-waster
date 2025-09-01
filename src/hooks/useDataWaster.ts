@@ -1,9 +1,7 @@
-/* useDataWaster.ts
-   -- React/TS hook that spams up- & downloads while reporting live metrics.
-   -- Header + query-string sizes were reduced (3 × 512 B instead of 16 × 4 KB)
-      so every request is <6 KB, well below common limits. */
-
 import { useCallback, useEffect, useRef, useState } from "react";
+import { rand } from "@util/random";
+import { sleep } from "@util/async";
+import { logOnce } from "@util/logging";
 
 /* ---------- public types ---------- */
 export interface Metrics {
@@ -16,6 +14,7 @@ export interface Metrics {
   totalPct: number;
   status: string;
 }
+
 export interface Options {
   sizeMB: number; // 0 = infinite
   threads: number; // 1–32
@@ -24,12 +23,31 @@ export interface Options {
 }
 
 /* ---------- constants ---------- */
-const MB = 1_048_576;
-const SRC_DOWN = "./data-waste.bin";
-const SRC_UP = "./wastebin.html";
-const QS_LEN = 512; //  ↘  reduced from 4 000
-const HDR_COUNT = 3; //  ↘  reduced from 16
-const HDR_LEN = 512; //  ↘  reduced from 4 000
+const BYTES_PER_MB = 1_048_576;
+const DOWNLOAD_SOURCE_FILE = "./data-waste.bin";
+const UPLOAD_ENDPOINT_URL = "./wastebin.html";
+const QUERY_STRING_LENGTH = 2000; // 2KB query string - safe for browsers and servers
+const HEADERS_PER_REQUEST = 64; // Reasonable number of headers
+const HEADER_VALUE_LENGTH = 1000; // 1KB per header value
+const HEADER_NAME_PREFIX_LENGTH = 10; // Length of random suffix for "X-Random-" headers
+const HEADER_OVERHEAD_BYTES = 2; // Bytes for ": " separator in HTTP headers
+
+// Timing constants
+const UI_UPDATE_INTERVAL_MS = 50; // How often to update metrics display
+const DOWNLOAD_RETRY_DELAY_MS = 50; // Delay between download attempts
+const UPLOAD_RETRY_DELAY_MS = 30; // Delay between upload attempts
+
+// Performance monitoring
+const SLOW_NETWORK_THRESHOLD_SECONDS = 30; // Time before showing slow network warning
+const SLOW_NETWORK_SPEED_MBPS = 1; // Speed threshold for slow network warning
+
+// Thread management
+const MIN_THREAD_COUNT = 1; // Minimum threads to ensure at least one worker
+const DEFAULT_THREAD_COUNT = 8; // Default number of concurrent connections
+
+// Math constants
+const PERCENT_MULTIPLIER = 100; // Convert decimal to percentage
+const MS_PER_SECOND = 1000; // Milliseconds in a second
 
 /* -------------------------------------------------------------------- */
 export function useDataWaster() {
@@ -46,175 +64,226 @@ export function useDataWaster() {
   });
 
   /* refs that survive re-renders ------------------------------------- */
-  const running = useRef(false);
-  const bytesDown = useRef(0);
-  const bytesUp = useRef(0);
-  const epoch = useRef(0);
-  const firstResp = useRef(false);
-  const dlCtrl = useRef<AbortController[]>([]);
-  const upCtrl = useRef<AbortController[]>([]);
-  const timer = useRef<NodeJS.Timeout>(undefined);
+  const running = useRef(false); // Track if data wasting is active
+  const bytesDown = useRef(0); // Total bytes downloaded
+  const bytesUp = useRef(0); // Total bytes uploaded
+  const epoch = useRef(0); // Start time of the current operation
+  const firstResp = useRef(false); // Whether first server response received
+  const dlCtl = useRef<AbortController[]>([]); // Download thread controllers
+  const ulCtl = useRef<AbortController[]>([]); // Upload thread controllers
+  const timer = useRef<NodeJS.Timeout>(undefined); // UI update interval timer
   const opts = useRef<Options>({
-    sizeMB: 0,
-    threads: 8,
+    sizeMB: 0, // 0 = infinite mode
+    threads: DEFAULT_THREAD_COUNT, // Number of concurrent connections
     download: true,
-    upload: false,
+    upload: true,
   });
-  const logGate = useRef(0); // rate-limit console errors
-
-  /* helpers ----------------------------------------------------------- */
-  const rand = (n: number) => {
-    const c = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    const a = new Uint32Array(n);
-    crypto.getRandomValues(a);
-    return Array.from(a, (x) => c[x % c.length]).join("");
-  };
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const logOnce = (e: unknown) => {
-    const now = Date.now();
-    if (now - logGate.current > 1_000) {
-      console.error(e);
-      logGate.current = now;
-    }
+  
+  /* helper functions ------------------------------------------------- */
+  const isComplete = () => {
+    if (opts.current.sizeMB === 0) { return false; } // Infinite mode never completes
+    
+    const totalBytes = bytesDown.current + bytesUp.current;
+    const targetBytes = opts.current.sizeMB * BYTES_PER_MB;
+    return totalBytes >= targetBytes;
   };
 
   /* metric updater ---------------------------------------------------- */
-  const pulse = () => {
-    const o = opts.current;
-    const dMB = bytesDown.current / MB;
-    const uMB = bytesUp.current / MB;
-    const tMB = dMB + uMB;
-    const cap = o.sizeMB || Infinity;
-    const pct = (v: number) => (cap === Infinity ? 0 : (v / cap) * 100);
-    const secs = (Date.now() - epoch.current) / 1000;
-    const vMB = secs ? tMB / secs : 0;
+  const updateMetrics = () => {
+    const currentOptions = opts.current;
+    const downloadedMB = bytesDown.current / BYTES_PER_MB;
+    const uploadedMB = bytesUp.current / BYTES_PER_MB;
+    const totalMB = downloadedMB + uploadedMB;
+    const targetCapacityMB = currentOptions.sizeMB || Infinity;
+    const calculatePercentage = (valueMB: number) =>
+      targetCapacityMB === Infinity
+        ? 0
+        : (valueMB / targetCapacityMB) * PERCENT_MULTIPLIER;
+    const elapsedSeconds = (Date.now() - epoch.current) / MS_PER_SECOND;
+    const speedMBps = elapsedSeconds ? totalMB / elapsedSeconds : 0;
 
-    setMetrics((m) => ({
-      ...m,
-      downloadedMB: dMB,
-      uploadedMB: uMB,
-      totalMB: tMB,
-      speedMBps: vMB,
-      downloadPct: pct(dMB),
-      uploadPct: pct(uMB),
-      totalPct: pct(tMB),
+    setMetrics((previousMetrics) => ({
+      ...previousMetrics,
+      downloadedMB: downloadedMB,
+      uploadedMB: uploadedMB,
+      totalMB: totalMB,
+      speedMBps: speedMBps,
+      downloadPct: calculatePercentage(downloadedMB),
+      uploadPct: calculatePercentage(uploadedMB),
+      totalPct: calculatePercentage(totalMB),
     }));
 
     /* auto-stop finite runs */
-    if (o.sizeMB && tMB >= o.sizeMB && running.current) {
+    if (
+      currentOptions.sizeMB &&
+      totalMB >= currentOptions.sizeMB &&
+      running.current
+    ) {
       stop();
-      setMetrics((m) => ({ ...m, status: "Completed" }));
+      setMetrics((previousMetrics) => ({
+        ...previousMetrics,
+        status: "Completed",
+      }));
     }
 
     /* slow network warning */
     if (
       running.current &&
-      secs > 30 &&
-      vMB < 1 &&
+      elapsedSeconds > SLOW_NETWORK_THRESHOLD_SECONDS &&
+      speedMBps < SLOW_NETWORK_SPEED_MBPS &&
       firstResp.current &&
-      o.sizeMB
+      currentOptions.sizeMB
     ) {
-      setMetrics((m) => ({
-        ...m,
+      setMetrics((previousMetrics) => ({
+        ...previousMetrics,
         status: "Network too slow to waste efficiently",
       }));
     }
   };
 
   /* start / stop public API ------------------------------------------ */
-  const start = useCallback((o: Options) => {
-    if (running.current) return;
-    if (!o.download && !o.upload) {
-      setMetrics((m) => ({ ...m, status: "Select at least one mode" }));
+  const start = useCallback((options: Options) => {
+    if (running.current) { return; }
+    
+    if (!options.download && !options.upload) {
+      setMetrics((previousMetrics) => ({
+        ...previousMetrics,
+        status: "Select at least one mode",
+      }));
       return;
     }
 
-    opts.current = o;
+    opts.current = options;
     bytesDown.current = 0;
     bytesUp.current = 0;
-    dlCtrl.current = [];
-    upCtrl.current = [];
+    dlCtl.current = [];
+    ulCtl.current = [];
     firstResp.current = false;
     epoch.current = Date.now();
     running.current = true;
 
-    pulse();
-    timer.current = setInterval(pulse, 50);
+    updateMetrics();
+    timer.current = setInterval(updateMetrics, UI_UPDATE_INTERVAL_MS);
 
-    if (o.download) spawnDownloads();
-    if (o.upload) spawnUploads();
-  }, []);
+    if (options.download) { spawnDownloads(); }
+    if (options.upload) { spawnUploads(); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stop = useCallback(() => {
-    if (!running.current) return;
+    if (!running.current) { return; }
+
     running.current = false;
-    dlCtrl.current.forEach((c) => c.abort());
-    upCtrl.current.forEach((c) => c.abort());
-    if (timer.current) clearInterval(timer.current);
-    setMetrics((m) => ({ ...m, status: "Stopped" }));
+    dlCtl.current.forEach((controller) => controller.abort());
+    ulCtl.current.forEach((controller) => controller.abort());
+
+    if (timer.current) { clearInterval(timer.current); }
+
+    setMetrics((previousMetrics) => ({
+      ...previousMetrics,
+      status: "Stopped",
+      speedMBps: 0,
+    }));
   }, []);
 
   /* workers ----------------------------------------------------------- */
   const spawnDownloads = () => {
-    const n = opts.current.upload
-      ? Math.max(1, opts.current.threads >> 1)
+    // Use half threads for downloads when also uploading, otherwise use all threads
+    const threadCount = opts.current.upload
+      ? Math.max(MIN_THREAD_COUNT, Math.floor(opts.current.threads / 2)) // Half threads when running both modes
       : opts.current.threads;
-    for (let i = 0; i < n; i++) downloadWorker(i);
+    
+    // Spawn download workers in parallel
+    Array.from({ length: threadCount }, (_, threadId) => downloadWorker(threadId));
   };
-  const downloadWorker = async (id: number) => {
-    const ac = new AbortController();
-    dlCtrl.current[id] = ac;
-    while (running.current) {
+
+  const downloadWorker = async (threadId: number) => {
+    const abortController = new AbortController();
+
+    dlCtl.current[threadId] = abortController;
+
+    while (running.current && !isComplete()) {
       try {
-        const r = await fetch(`${SRC_DOWN}?t=${Date.now()}-${Math.random()}`, {
-          headers: { "Accept-Encoding": "identity" },
-          signal: ac.signal,
-        });
+        // Add timestamp and random value to prevent caching
+        const cacheBustingParams = `${Date.now()}-${Math.random()}`;
+        const response = await fetch(
+          `${DOWNLOAD_SOURCE_FILE}?t=${cacheBustingParams}`,
+          {
+            headers: { "Accept-Encoding": "identity" }, // Prevent compression
+            signal: abortController.signal,
+          },
+        );
+
         firstResp.current = true;
-        const rd = r.body!.getReader();
-        while (running.current) {
-          const { done, value } = await rd.read();
-          if (done) break;
+
+        const reader = response.body!.getReader();
+
+        while (running.current && !isComplete()) {
+          const { done, value } = await reader.read();
+          if (done) { break; }
+          
+          // Count all bytes received
           bytesDown.current += value!.length;
         }
-      } catch (e) {
-        logOnce(e);
+      } catch (error) {
+        logOnce(error);
       }
-      await sleep(50);
+
+      if (!isComplete() && running.current) {
+        await sleep(DOWNLOAD_RETRY_DELAY_MS);
+      }
     }
   };
 
   const spawnUploads = () => {
-    const n = opts.current.download
-      ? Math.max(1, opts.current.threads >> 1)
+    // Use half threads for uploads when also downloading, otherwise use all threads
+    const threadCount = opts.current.download
+      ? Math.max(MIN_THREAD_COUNT, Math.floor(opts.current.threads / 2)) // Half threads when running both modes
       : opts.current.threads;
-    for (let i = 0; i < n; i++) uploadWorker(i);
+    
+
+    // Spawn upload workers in parallel
+    Array.from({ length: threadCount }, (_, threadId) => uploadWorker(threadId));
   };
-  const uploadWorker = async (id: number) => {
-    const ac = new AbortController();
-    upCtrl.current[id] = ac;
-    while (running.current) {
+
+  const uploadWorker = async (threadId: number) => {
+    const abortController = new AbortController();
+
+    ulCtl.current[threadId] = abortController;
+
+    while (running.current && !isComplete()) {
       try {
-        const qs = rand(QS_LEN);
-        const hdr: Record<string, string> = {};
-        let hdrBytes = 0;
-        for (let i = 0; i < HDR_COUNT; i++) {
-          const k = `X-${rand(6)}`,
-            v = rand(HDR_LEN);
-          hdr[k] = v;
-          hdrBytes += k.length + v.length + 2;
-        }
-        await fetch(`${SRC_UP}?w=${qs}`, {
+        const queryStringData = rand(QUERY_STRING_LENGTH);
+        
+        // Generate random headers to increase upload payload size
+        const headerData = Array.from({ length: HEADERS_PER_REQUEST }, () => {
+          const headerName = `X-Random-${rand(HEADER_NAME_PREFIX_LENGTH)}`;
+          const headerValue = rand(HEADER_VALUE_LENGTH);
+          const headerBytes = headerName.length + headerValue.length + HEADER_OVERHEAD_BYTES;
+          return { name: headerName, value: headerValue, bytes: headerBytes };
+        });
+        
+        const randomHeaders = headerData.reduce<Record<string, string>>((acc, { name, value }) => {
+          acc[name] = value;
+          return acc;
+        }, {});
+        
+        const totalHeaderBytes = headerData.reduce((sum, { bytes }) => sum + bytes, 0);
+
+        await fetch(`${UPLOAD_ENDPOINT_URL}?waste=${queryStringData}`, {
           method: "GET",
-          headers: { "Content-Encoding": "identity", ...hdr },
-          signal: ac.signal,
-        }).catch(() => {});
+          headers: { "Content-Encoding": "identity", ...randomHeaders }, // Prevent compression
+          signal: abortController.signal,
+        });
+
         firstResp.current = true;
-        bytesUp.current += qs.length + hdrBytes;
-      } catch (e) {
-        logOnce(e);
+        bytesUp.current += queryStringData.length + totalHeaderBytes;
+      } catch (error) {
+        logOnce(error);
       }
-      await sleep(30);
+      
+      if (!isComplete() && running.current) {
+        await sleep(UPLOAD_RETRY_DELAY_MS);
+      }
     }
   };
 
