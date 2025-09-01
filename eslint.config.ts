@@ -10,7 +10,7 @@ export default tseslint.config(
   tseslint.configs.recommended,
   { ignores: ["dist"] },
   {
-    files: ["src/*.{js,jsx,ts,tsx}"],
+    files: ["src/**/*.{js,jsx,ts,tsx}"],
     ignores: ["dist/**/*", "chrome-debug-profile"],
     plugins: {
       react: reactPlugin,
@@ -26,6 +26,11 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      "curly": ["error", "all"],
+      "brace-style": ["error", "1tbs", { "allowSingleLine": true }],
+      "block-spacing": ["error", "always"],
+      "max-statements-per-line": ["error", { "max": 2 }],
+      "nonblock-statement-body-position": ["error", "beside"],
       "react-refresh/only-export-components": [
         "warn",
         { allowConstantExport: true },

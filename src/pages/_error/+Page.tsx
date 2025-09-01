@@ -4,7 +4,7 @@ import safeStringify from "@util/safe-stringify";
 import { usePageContext } from "vike-react/usePageContext";
 
 const ErrorWrapper = ({ children }: { children: React.ReactNode }) => (
-  <div className="flex flex-col items-center justify-center h-screen">
+  <div className={"flex flex-col items-center justify-center h-screen"}>
     {children}
   </div>
 );
