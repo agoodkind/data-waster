@@ -1,0 +1,57 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Dev",
+      "cwd": "${workspaceFolder}",
+      "request": "launch",
+      "type": "node-terminal",
+      "command": "NO_COLOR=true pnpm run dev",
+      "smartStep": true,
+      "internalConsoleOptions": "openOnSessionStart",
+      "skipFiles": [
+        "<node_internals>/**",
+        "${workspaceFolder}/node_modules/**"
+      ],
+      "serverReadyAction": {
+        "action": "startDebugging",
+        "name": "Open Dev in Chrome",
+        "killOnServerStop": false,
+        "pattern": "http:\\/\\/localhost:([0-9]+)\\/"
+      },
+      "presentation": {
+        "group": "Vike"
+      }
+    },
+    {
+      "name": "Open Dev in Chrome",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/dist",
+      "skipFiles": [
+        "<node_internals>/**",
+        "${workspaceFolder}/node_modules/**"
+      ],
+      "smartStep": true,
+      "sourceMaps": true,
+      "userDataDir": "${userHome}/chrome-debug-profile",
+      "internalConsoleOptions": "openOnSessionStart",
+      "presentation": {
+        "hidden": true
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview"],
+      "skipFiles": ["<node_internals>/**"],
+      "console": "integratedTerminal",
+      "presentation": {
+        "group": "Vike"
+      }
+    }
+  ]
+}
