@@ -30,10 +30,10 @@ class DataWaster {
     #uploadControllers = [];
   
     /** @type {string} */
-    #downloadFile = '/data-waste.bin';
+    #downloadFile = './data-waste.bin';
   
     /** @type {string} */
-    #uploadEndpoint = '/wastebin.html';
+    #uploadEndpoint = './wastebin.html';
   
     /** @type {number} */
     #chunkSize = 100 * 1024 * 1024;
