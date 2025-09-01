@@ -14,6 +14,7 @@ export interface Metrics {
   totalPct: number;
   status: string;
 }
+
 export interface Options {
   sizeMB: number; // 0 = infinite
   threads: number; // 1–32
@@ -25,9 +26,9 @@ export interface Options {
 const BYTES_PER_MB = 1_048_576;
 const DOWNLOAD_SOURCE_FILE = "./data-waste.bin";
 const UPLOAD_ENDPOINT_URL = "./wastebin.html";
-const QUERY_STRING_LENGTH = 65536; // 64KB query string - maximum safe URL length
-const HEADERS_PER_REQUEST = 100; // Maximum headers for larger payload
-const HEADER_VALUE_LENGTH = 512; // 512 bytes per header to balance size and count
+const QUERY_STRING_LENGTH = 2000; // 2KB query string - safe for browsers and servers
+const HEADERS_PER_REQUEST = 64; // Reasonable number of headers
+const HEADER_VALUE_LENGTH = 1000; // 1KB per header value
 const HEADER_NAME_PREFIX_LENGTH = 10; // Length of random suffix for "X-Random-" headers
 const HEADER_OVERHEAD_BYTES = 2; // Bytes for ": " separator in HTTP headers
 
@@ -43,7 +44,6 @@ const SLOW_NETWORK_SPEED_MBPS = 1; // Speed threshold for slow network warning
 // Thread management
 const MIN_THREAD_COUNT = 1; // Minimum threads to ensure at least one worker
 const DEFAULT_THREAD_COUNT = 8; // Default number of concurrent connections
-const PARALLEL_REQUESTS_PER_THREAD = 3; // Number of simultaneous requests per upload thread
 
 // Math constants
 const PERCENT_MULTIPLIER = 100; // Convert decimal to percentage
@@ -78,6 +78,15 @@ export function useDataWaster() {
     download: true,
     upload: true,
   });
+  
+  /* helper functions ------------------------------------------------- */
+  const isComplete = () => {
+    if (opts.current.sizeMB === 0) { return false; } // Infinite mode never completes
+    
+    const totalBytes = bytesDown.current + bytesUp.current;
+    const targetBytes = opts.current.sizeMB * BYTES_PER_MB;
+    return totalBytes >= targetBytes;
+  };
 
   /* metric updater ---------------------------------------------------- */
   const updateMetrics = () => {
@@ -135,7 +144,7 @@ export function useDataWaster() {
   /* start / stop public API ------------------------------------------ */
   const start = useCallback((options: Options) => {
     if (running.current) { return; }
-
+    
     if (!options.download && !options.upload) {
       setMetrics((previousMetrics) => ({
         ...previousMetrics,
@@ -158,7 +167,7 @@ export function useDataWaster() {
 
     if (options.download) { spawnDownloads(); }
     if (options.upload) { spawnUploads(); }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stop = useCallback(() => {
     if (!running.current) { return; }
@@ -182,9 +191,9 @@ export function useDataWaster() {
     const threadCount = opts.current.upload
       ? Math.max(MIN_THREAD_COUNT, Math.floor(opts.current.threads / 2)) // Half threads when running both modes
       : opts.current.threads;
-    for (let threadId = 0; threadId < threadCount; threadId++) {
-      downloadWorker(threadId);
-    }
+    
+    // Spawn download workers in parallel
+    Array.from({ length: threadCount }, (_, threadId) => downloadWorker(threadId));
   };
 
   const downloadWorker = async (threadId: number) => {
@@ -192,7 +201,7 @@ export function useDataWaster() {
 
     dlCtl.current[threadId] = abortController;
 
-    while (running.current) {
+    while (running.current && !isComplete()) {
       try {
         // Add timestamp and random value to prevent caching
         const cacheBustingParams = `${Date.now()}-${Math.random()}`;
@@ -208,16 +217,20 @@ export function useDataWaster() {
 
         const reader = response.body!.getReader();
 
-        while (running.current) {
+        while (running.current && !isComplete()) {
           const { done, value } = await reader.read();
           if (done) { break; }
+          
+          // Count all bytes received
           bytesDown.current += value!.length;
         }
       } catch (error) {
         logOnce(error);
       }
 
-      await sleep(DOWNLOAD_RETRY_DELAY_MS);
+      if (!isComplete() && running.current) {
+        await sleep(DOWNLOAD_RETRY_DELAY_MS);
+      }
     }
   };
 
@@ -226,9 +239,10 @@ export function useDataWaster() {
     const threadCount = opts.current.download
       ? Math.max(MIN_THREAD_COUNT, Math.floor(opts.current.threads / 2)) // Half threads when running both modes
       : opts.current.threads;
-    for (let threadId = 0; threadId < threadCount; threadId++) {
-      uploadWorker(threadId);
-    }
+    
+
+    // Spawn upload workers in parallel
+    Array.from({ length: threadCount }, (_, threadId) => uploadWorker(threadId));
   };
 
   const uploadWorker = async (threadId: number) => {
@@ -236,29 +250,29 @@ export function useDataWaster() {
 
     ulCtl.current[threadId] = abortController;
 
-    while (running.current) {
+    while (running.current && !isComplete()) {
       try {
         const queryStringData = rand(QUERY_STRING_LENGTH);
-        const randomHeaders: Record<string, string> = {};
-
-        let totalHeaderBytes = 0;
-
+        
         // Generate random headers to increase upload payload size
-        for (let i = 0; i < HEADERS_PER_REQUEST; i++) {
+        const headerData = Array.from({ length: HEADERS_PER_REQUEST }, () => {
           const headerName = `X-Random-${rand(HEADER_NAME_PREFIX_LENGTH)}`;
           const headerValue = rand(HEADER_VALUE_LENGTH);
-          randomHeaders[headerName] = headerValue;
-          // Count bytes: header name + ": " separator + header value
-          totalHeaderBytes +=
-            headerName.length + headerValue.length + HEADER_OVERHEAD_BYTES;
-        }
+          const headerBytes = headerName.length + headerValue.length + HEADER_OVERHEAD_BYTES;
+          return { name: headerName, value: headerValue, bytes: headerBytes };
+        });
+        
+        const randomHeaders = headerData.reduce<Record<string, string>>((acc, { name, value }) => {
+          acc[name] = value;
+          return acc;
+        }, {});
+        
+        const totalHeaderBytes = headerData.reduce((sum, { bytes }) => sum + bytes, 0);
 
         await fetch(`${UPLOAD_ENDPOINT_URL}?waste=${queryStringData}`, {
           method: "GET",
           headers: { "Content-Encoding": "identity", ...randomHeaders }, // Prevent compression
           signal: abortController.signal,
-        }).catch((error) => {
-          logOnce(error);
         });
 
         firstResp.current = true;
@@ -266,7 +280,10 @@ export function useDataWaster() {
       } catch (error) {
         logOnce(error);
       }
-      await sleep(UPLOAD_RETRY_DELAY_MS);
+      
+      if (!isComplete() && running.current) {
+        await sleep(UPLOAD_RETRY_DELAY_MS);
+      }
     }
   };
 
