@@ -30,10 +30,10 @@ class DataWaster {
     #uploadControllers = [];
   
     /** @type {string} */
-    #downloadFile = '/data-waste.bin';
+    #downloadFile = './data-waste.bin';
   
     /** @type {string} */
-    #uploadEndpoint = '/wastebin.html';
+    #uploadEndpoint = './wastebin.html';
   
     /** @type {number} */
     #chunkSize = 100 * 1024 * 1024;
@@ -84,13 +84,13 @@ class DataWaster {
     const langCode = navigator.language.startsWith('ko') ? 'ko' : 'en';
 
     try {
-      const response = await fetch(`/langs-${langCode}.json`);
+      const response = await fetch(`./langs-${langCode}.json`);
       if (!response.ok) throw new Error('Failed to load language file');
       this.#lang = await response.json();
     } catch (error) {
       console.error('Error loading language file:', error);
       try {
-        const fallbackResponse = await fetch('/langs-en.json');
+        const fallbackResponse = await fetch('./langs-en.json');
         this.#lang = await fallbackResponse.json();
       } catch (e) {
         console.error('Could not load fallback language file:', e);

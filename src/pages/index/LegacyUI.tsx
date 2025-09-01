@@ -4,7 +4,7 @@ export default function LegacyUI({ onSwitchToModern }: { onSwitchToModern?: () =
   useEffect(() => {
     // Load the legacy script
     const script = document.createElement("script");
-    script.src = "/legacy.js";
+    script.src = "./legacy.js";
     script.async = true;
     document.body.appendChild(script);
 
