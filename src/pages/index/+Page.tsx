@@ -1,5 +1,6 @@
 import { Options, useDataWaster } from "@hooks/useDataWaster";
 import { useState } from "react";
+import LegacyUI from "./LegacyUI";
 
 export default function DataWasterPage() {
   /* UI state ------------------------------------------------------------ */
@@ -7,6 +8,7 @@ export default function DataWasterPage() {
   const [upload, setUpload] = useState(true);
   const [sizeMB, setSizeMB] = useState(10000);
   const [threads, setThreads] = useState(16);
+  const [legacyMode, setLegacyMode] = useState(false);
 
   /* engine -------------------------------------------------------------- */
   const { metrics, start, stop, running } = useDataWaster();
@@ -21,6 +23,10 @@ export default function DataWasterPage() {
   };
 
   /* render -------------------------------------------------------------- */
+  if (legacyMode) {
+    return <LegacyUI onSwitchToModern={() => setLegacyMode(false)} />;
+  }
+
   return (
     <main className={"max-w-md mx-auto p-6 space-y-8 font-sans"}>
       {/* title */}
@@ -29,6 +35,14 @@ export default function DataWasterPage() {
         <p className={"text-gray-500"}>
           Burn bandwidth for tests or throttling detection.
         </p>
+        
+        {/* Legacy mode toggle */}
+        <button
+          onClick={() => setLegacyMode(true)}
+          className={"mt-4 text-sm text-blue-600 hover:underline"}
+        >
+          Switch to Legacy UI →
+        </button>
       </header>
 
       {/* mode toggles */}
