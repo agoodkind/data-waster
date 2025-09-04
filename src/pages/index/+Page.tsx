@@ -1,14 +1,20 @@
 import { Options, useDataWaster } from "@hooks/useDataWaster";
-import { useState } from "react";
-import LegacyUI from "./LegacyUI";
+import { useDataWasterSettings } from "@hooks/useSettings";
+import { Toggle } from "@components/Toggle";
+import { Stat } from "@components/Stat";
 
 export default function DataWasterPage() {
-  /* UI state ------------------------------------------------------------ */
-  const [download, setDownload] = useState(true);
-  const [upload, setUpload] = useState(true);
-  const [sizeMB, setSizeMB] = useState(10000);
-  const [threads, setThreads] = useState(16);
-  const [legacyMode, setLegacyMode] = useState(false);
+  /* Settings with cookie persistence ----------------------------------- */
+  const {
+    download,
+    upload,
+    sizeMB,
+    threads,
+    setDownload,
+    setUpload,
+    setSizeMB,
+    setThreads
+  } = useDataWasterSettings();
 
   /* engine -------------------------------------------------------------- */
   const { metrics, start, stop, running } = useDataWaster();
@@ -22,11 +28,6 @@ export default function DataWasterPage() {
     start(opts);
   };
 
-  /* render -------------------------------------------------------------- */
-  if (legacyMode) {
-    return <LegacyUI onSwitchToModern={() => setLegacyMode(false)} />;
-  }
-
   return (
     <main className={"max-w-md mx-auto p-6 space-y-8 font-sans"}>
       {/* title */}
@@ -35,14 +36,6 @@ export default function DataWasterPage() {
         <p className={"text-gray-500"}>
           Burn bandwidth for tests or throttling detection.
         </p>
-        
-        {/* Legacy mode toggle */}
-        <button
-          onClick={() => setLegacyMode(true)}
-          className={"mt-4 text-sm text-blue-600 hover:underline"}
-        >
-          Switch to Legacy UI →
-        </button>
       </header>
 
       {/* mode toggles */}
@@ -124,36 +117,5 @@ export default function DataWasterPage() {
         {metrics.status}
       </p>
     </main>
-  );
-}
-
-/* ---------------- helpers -------------------------------------------- */
-
-function Toggle({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-4 py-2 rounded border border-blue-600 transition
-                  ${active ? "bg-blue-600 text-white" : "text-blue-600"}`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <span className={"block text-gray-500"}>{label}</span>
-      <span className={"font-mono"}>{value.toFixed(2)}</span>
-    </div>
   );
 }
