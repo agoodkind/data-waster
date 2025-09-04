@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useCookies } from "react-cookie";
+import { DataWasterOptions } from "./useDataWaster";
+import { DEFAULT_TARGET_DOWNLOAD_SIZE_MB } from "@/constants";
+import { DEFAULT_THREAD_COUNT } from "@/constants";
 
 // Cookie keys for storing user preferences
 const COOKIE_KEYS = {
-  DOWNLOAD: 'data-waster-download',
-  UPLOAD: 'data-waster-upload',
-  SIZE_MB: 'data-waster-sizeMB',
-  THREADS: 'data-waster-threads'
+  TARGET_DOWNLOAD_SIZE: 'data-waster-targetDownloadSize',
+  THREAD_COUNT: 'data-waster-threadCount'
 } as const;
 
 // Cookie options
@@ -16,15 +17,9 @@ const COOKIE_OPTIONS = {
   sameSite: 'lax' as const
 };
 
-export interface DataWasterSettings {
-  download: boolean;
-  upload: boolean;
-  sizeMB: number;
-  threads: number;
-  setDownload: (value: boolean) => void;
-  setUpload: (value: boolean) => void;
-  setSizeMB: (value: number) => void;
-  setThreads: (value: number) => void;
+export interface DataWasterSettings extends DataWasterOptions {
+  setTargetDownloadSize: (value: number) => void;
+  setThreadCount: (value: number) => void;
 }
 
 /**
@@ -34,56 +29,32 @@ export interface DataWasterSettings {
 export function useDataWasterSettings(): DataWasterSettings {
   const [cookies, setCookie] = useCookies(Object.values(COOKIE_KEYS));
 
-  /* Initialize state from cookies or defaults ----------------------------- */
-  const [download, setDownloadState] = useState(() => 
-    cookies[COOKIE_KEYS.DOWNLOAD] === 'true' || 
-    cookies[COOKIE_KEYS.DOWNLOAD] === undefined ? true : false
+  const [targetDownloadSize, setTargetDownloadSizeState] = useState(() => 
+    Number(cookies[COOKIE_KEYS.TARGET_DOWNLOAD_SIZE]) || DEFAULT_TARGET_DOWNLOAD_SIZE_MB  
   );
   
-  const [upload, setUploadState] = useState(() => 
-    cookies[COOKIE_KEYS.UPLOAD] === 'true' || 
-    cookies[COOKIE_KEYS.UPLOAD] === undefined ? true : false
-  );
-  
-  const [sizeMB, setSizeMBState] = useState(() => 
-    Number(cookies[COOKIE_KEYS.SIZE_MB]) || 10000
-  );
-  
-  const [threads, setThreadsState] = useState(() => 
-    Number(cookies[COOKIE_KEYS.THREADS]) || 16
+  const [threadCount, setThreadCountState] = useState(() => 
+    Number(cookies[COOKIE_KEYS.THREAD_COUNT]) || DEFAULT_THREAD_COUNT
   );
 
   /* Save to cookies when values change ------------------------------------ */
-  useEffect(() => {
-    setCookie(COOKIE_KEYS.DOWNLOAD, String(download), COOKIE_OPTIONS);
-  }, [download, setCookie]);
 
   useEffect(() => {
-    setCookie(COOKIE_KEYS.UPLOAD, String(upload), COOKIE_OPTIONS);
-  }, [upload, setCookie]);
+      setCookie(COOKIE_KEYS.TARGET_DOWNLOAD_SIZE, String(targetDownloadSize), COOKIE_OPTIONS);
+    }, [targetDownloadSize, setCookie]);
 
   useEffect(() => {
-    setCookie(COOKIE_KEYS.SIZE_MB, String(sizeMB), COOKIE_OPTIONS);
-  }, [sizeMB, setCookie]);
-
-  useEffect(() => {
-    setCookie(COOKIE_KEYS.THREADS, String(threads), COOKIE_OPTIONS);
-  }, [threads, setCookie]);
+    setCookie(COOKIE_KEYS.THREAD_COUNT, String(threadCount), COOKIE_OPTIONS);
+  }, [threadCount, setCookie]);
 
   /* Wrapper functions for setters ----------------------------------------- */
-  const setDownload = (value: boolean) => setDownloadState(value);
-  const setUpload = (value: boolean) => setUploadState(value);
-  const setSizeMB = (value: number) => setSizeMBState(value);
-  const setThreads = (value: number) => setThreadsState(value);
+  const setTargetDownloadSize = (value: number) => setTargetDownloadSizeState(value);
+  const setThreadCount = (value: number) => setThreadCountState(value);
 
   return {
-    download,
-    upload,
-    sizeMB,
-    threads,
-    setDownload,
-    setUpload,
-    setSizeMB,
-    setThreads
+    targetDownloadSize,
+    threadCount,
+    setTargetDownloadSize,
+    setThreadCount,
   };
 }

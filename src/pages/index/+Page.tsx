@@ -1,19 +1,14 @@
-import { Options, useDataWaster } from "@hooks/useDataWaster";
+import { DataWasterOptions, useDataWaster } from "@hooks/useDataWaster";
 import { useDataWasterSettings } from "@hooks/useSettings";
-import { Toggle } from "@components/Toggle";
 import { Stat } from "@components/Stat";
 
 export default function DataWasterPage() {
   /* Settings with cookie persistence ----------------------------------- */
   const {
-    download,
-    upload,
-    sizeMB,
-    threads,
-    setDownload,
-    setUpload,
-    setSizeMB,
-    setThreads
+    targetDownloadSize,
+    threadCount,
+    setTargetDownloadSize,
+    setThreadCount
   } = useDataWasterSettings();
 
   /* engine -------------------------------------------------------------- */
@@ -24,7 +19,7 @@ export default function DataWasterPage() {
       stop();
       return;
     }
-    const opts: Options = { sizeMB, threads, download, upload };
+    const opts: DataWasterOptions = { targetDownloadSize, threadCount };
     start(opts);
   };
 
@@ -38,28 +33,14 @@ export default function DataWasterPage() {
         </p>
       </header>
 
-      {/* mode toggles */}
-      <div className={"flex justify-center gap-4"}>
-        <Toggle
-          active={download}
-          label={"Download"}
-          onClick={() => setDownload(!download)}
-        />
-        <Toggle
-          active={upload}
-          label={"Upload"}
-          onClick={() => setUpload(!upload)}
-        />
-      </div>
-
       {/* inputs */}
       <label className={"block mb-4"}>
         <span className={"text-sm mr-2"}>Target size&nbsp;(MB, 0 = ∞)</span>
         <input
           type={"number"}
           min={0}
-          value={sizeMB}
-          onChange={(e) => setSizeMB(Number(e.target.value))}
+          value={targetDownloadSize}
+          onChange={(e) => setTargetDownloadSize(Number(e.target.value))}
           className={"w-28 px-2 py-1 border rounded"}
         />
       </label>
@@ -70,17 +51,16 @@ export default function DataWasterPage() {
           type={"range"}
           min={1}
           max={32}
-          value={threads}
-          onChange={(e) => setThreads(Number(e.target.value))}
+          value={threadCount}
+          onChange={(e) => setThreadCount(Number(e.target.value))}
           className={"flex-1 accent-blue-600"}
         />
-        <span className={"w-6 text-right"}>{threads}</span>
+        <span className={"w-6 text-right"}>{threadCount}</span>
       </label>
 
       {/* start / stop */}
       <button
         onClick={handleStartStop}
-        disabled={!download && !upload}
         className={`w-full py-2 rounded text-white transition
                     ${
                       running
@@ -94,22 +74,20 @@ export default function DataWasterPage() {
       {/* single progress bar */}
       <div className={"mt-8 space-y-1"}>
         <span className={"text-xs text-gray-600"}>
-          {metrics.totalPct.toFixed(1)}%
+          {metrics.downloadedPercent.toFixed(1)}%
         </span>
         <div className={"w-full h-3 bg-gray-200 rounded overflow-hidden"}>
           <div
             className={"h-full bg-blue-600 transition-all"}
-            style={{ width: `${metrics.totalPct}%` }}
+            style={{ width: `${metrics.downloadedPercent}%` }}
           />
         </div>
       </div>
 
       {/* stats */}
       <section className={"grid grid-cols-2 gap-4 text-center text-sm mt-6"}>
-        <Stat label={"Downloaded (MB)"} value={metrics.downloadedMB} />
-        <Stat label={"Uploaded (MB)"} value={metrics.uploadedMB} />
-        <Stat label={"Total (MB)"} value={metrics.totalMB} />
-        <Stat label={"Speed (MB/s)"} value={metrics.speedMBps} />
+        <Stat label={"Downloaded (MB)"} value={metrics.downloadedSize} />
+        <Stat label={"Speed (MB/s)"} value={metrics.currentSpeed} />
       </section>
 
       {/* status */}
