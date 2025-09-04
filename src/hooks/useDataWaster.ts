@@ -1,52 +1,40 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { sleep } from "@util/async";
 import { logOnce } from "@util/logging";
+import { useMetrics } from "@hooks/useMetrics";
 import {
   BYTES_PER_MB,
   DOWNLOAD_SOURCE_FILE,
   UI_UPDATE_INTERVAL_MS,
   DOWNLOAD_RETRY_DELAY_MS,
-  SLOW_NETWORK_THRESHOLD_SECONDS,
-  SLOW_NETWORK_SPEED,
   DEFAULT_THREAD_COUNT,
-  PERCENT_MULTIPLIER,
-  MS_PER_SECOND,
   DEFAULT_TARGET_DOWNLOAD_SIZE_MB,
 } from "@/constants";
 
 /* ---------- public types ---------- */
-export interface Metrics {
-  downloadedSize: number;
-  currentSpeed: number;
-  downloadedPercent: number;
-  status: string;
-}
+export type { Metrics } from "@hooks/useMetrics";
 
 export interface DataWasterOptions {
   targetDownloadSize: number; // 0 = infinite
   threadCount: number; // 1–32
+  infiniteDownload: boolean;
 }
 
 /* -------------------------------------------------------------------- */
 export function useDataWaster() {
   /* live state -------------------------------------------------------- */
-  const [metrics, setMetrics] = useState<Metrics>({
-    downloadedSize: 0,
-    currentSpeed: 0,
-    downloadedPercent: 0,
-    status: "",
-  });
+  const { metrics, updateMetrics, resetMetrics, setStatus, setSpeed } = useMetrics();
 
   /* refs that survive re-renders ------------------------------------- */
   const running = useRef(false); // Track if data wasting is active
   const bytesDown = useRef(0); // Total bytes downloaded
-  const epoch = useRef(0); // Start time of the current operation
-  const firstResp = useRef(false); // Whether first server response received
+  const startTime = useRef(0); // Start time of the current operation
   const dlCtl = useRef<AbortController[]>([]); // Download thread controllers
   const timer = useRef<NodeJS.Timeout>(undefined); // UI update interval timer
   const opts = useRef<DataWasterOptions>({
     targetDownloadSize: DEFAULT_TARGET_DOWNLOAD_SIZE_MB, // 0 = infinite mode
     threadCount: DEFAULT_THREAD_COUNT, // Number of concurrent connections
+    infiniteDownload: false,
   });
 
   /* helper functions ------------------------------------------------- */
@@ -60,50 +48,30 @@ export function useDataWaster() {
     return totalBytes >= targetBytes;
   };
 
-  /* metric updater ---------------------------------------------------- */
-  const updateMetrics = () => {
-    const currentOptions = opts.current;
-    const downloadedSize = bytesDown.current / BYTES_PER_MB;
-    const targetDownloadSize = currentOptions.targetDownloadSize || Infinity;
-    const calculatePercentage = (valueMB: number) =>
-      targetDownloadSize === Infinity
-        ? 0
-        : (valueMB / targetDownloadSize) * PERCENT_MULTIPLIER;
-    const elapsedSeconds = (Date.now() - epoch.current) / MS_PER_SECOND;
-    const currentSpeed = elapsedSeconds ? downloadedSize / elapsedSeconds : 0;
-
-    setMetrics((previousMetrics) => ({
-      ...previousMetrics,
-      downloadedSize,
-      currentSpeed,
-      downloadedPercent: calculatePercentage(downloadedSize),
-    }));
-
-    /* auto-stop finite runs */
-    if (
-      currentOptions.targetDownloadSize &&
-      downloadedSize >= currentOptions.targetDownloadSize &&
-      running.current
-    ) {
-      stop();
-      setMetrics((previousMetrics) => ({
-        ...previousMetrics,
-        status: "Completed",
-      }));
+  /* stop internal helper ---------------------------------------------- */
+  const stopInternal = () => {
+    if (!running.current) {
+      return;
     }
 
-    /* slow network warning */
-    if (
-      running.current &&
-      elapsedSeconds > SLOW_NETWORK_THRESHOLD_SECONDS &&
-      currentSpeed < SLOW_NETWORK_SPEED &&
-      firstResp.current &&
-      currentOptions.targetDownloadSize
-    ) {
-      setMetrics((previousMetrics) => ({
-        ...previousMetrics,
-        status: "Network too slow to waste efficiently",
-      }));
+    running.current = false;
+    dlCtl.current.forEach((controller) => controller.abort());
+
+    if (timer.current) {
+      clearInterval(timer.current);
+    }
+  };
+
+  /* metric updater ---------------------------------------------------- */
+  const updateMetricsCallback = () => {
+    const { shouldStop } = updateMetrics({
+      bytesDownloaded: bytesDown.current,
+      startTime: startTime.current,
+      isRunning: running.current,
+    });
+
+    if (shouldStop) {
+      stopInternal();
     }
   };
 
@@ -116,34 +84,21 @@ export function useDataWaster() {
     opts.current = options;
     bytesDown.current = 0;
     dlCtl.current = [];
-    firstResp.current = false;
-    epoch.current = Date.now();
+    startTime.current = Date.now();
     running.current = true;
+    resetMetrics();
 
-    updateMetrics();
-    timer.current = setInterval(updateMetrics, UI_UPDATE_INTERVAL_MS);
+    updateMetricsCallback();
+    timer.current = setInterval(updateMetricsCallback, UI_UPDATE_INTERVAL_MS);
 
     spawnDownloads();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [resetMetrics]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stop = useCallback(() => {
-    if (!running.current) {
-      return;
-    }
-
-    running.current = false;
-    dlCtl.current.forEach((controller) => controller.abort());
-
-    if (timer.current) {
-      clearInterval(timer.current);
-    }
-
-    setMetrics((previousMetrics) => ({
-      ...previousMetrics,
-      status: "Stopped",
-      currentSpeed: 0,
-    }));
-  }, []);
+    stopInternal();
+    setStatus("Stopped");
+    setSpeed(0);
+  }, [setStatus, setSpeed]);
 
   /* workers ----------------------------------------------------------- */
   const spawnDownloads = () => {
@@ -172,8 +127,6 @@ export function useDataWaster() {
             signal: abortController.signal,
           }
         );
-
-        firstResp.current = true;
 
         const reader = response.body!.getReader();
 
