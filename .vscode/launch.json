@@ -13,28 +13,28 @@
         "<node_internals>/**",
         "${workspaceFolder}/node_modules/**"
       ],
+      
       "serverReadyAction": {
         "action": "startDebugging",
         "name": "Open Dev in Chrome",
-        "killOnServerStop": false,
+        "killOnServerStop": true,
         "pattern": "http:\\/\\/localhost:([0-9]+)\\/"
       },
       "presentation": {
-        "group": "Vike"
+        "group": "Vite"
       }
     },
     {
       "name": "Open Dev in Chrome",
       "type": "chrome",
       "request": "launch",
-      "url": "http://localhost:3000",
-      "webRoot": "${workspaceFolder}/dist",
+      "url": "http://localhost:5173",
       "skipFiles": [
         "<node_internals>/**",
         "${workspaceFolder}/node_modules/**"
       ],
+      "webRoot": "${workspaceFolder}/src",
       "smartStep": true,
-      "sourceMaps": true,
       "userDataDir": "${userHome}/chrome-debug-profile",
       "internalConsoleOptions": "openOnSessionStart",
       "presentation": {
@@ -50,7 +50,7 @@
       "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal",
       "presentation": {
-        "group": "Vike"
+        "group": "Vite"
       }
     }
   ]

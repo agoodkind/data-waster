@@ -12,7 +12,7 @@ const SLOW_NETWORK_THRESHOLD_SECONDS = 30; // Time before showing slow network w
 const SLOW_NETWORK_SPEED = 1; // Speed threshold for slow network warning
 
 // Thread management
-const DEFAULT_THREAD_COUNT = 8; // Default number of concurrent connections
+const DEFAULT_THREAD_COUNT = 16; // Default number of concurrent connections
 
 // Math constants
 const PERCENT_MULTIPLIER = 100; // Convert decimal to percentage
