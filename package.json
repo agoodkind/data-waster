@@ -36,14 +36,14 @@
     "favicons": "^7.3.0",
     "globals": "^17.7.0",
     "playwright": "^1.61.1",
-    "prettier": "3.9.4",
+    "prettier": "3.9.5",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.63.0",
     "vike": "^0.4.260",
     "vike-react": "^0.6.25",
     "vite": "^8.1.4",
     "vitest": "^4.1.10",
-    "wrangler": "^4.108.0"
+    "wrangler": "^4.110.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
