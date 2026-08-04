@@ -22,7 +22,7 @@
     "@eslint/js": "^9.39.5",
     "@types/facebook-pixel": "^0.0.31",
     "@types/gtag.js": "^0.0.20",
-    "@types/lodash": "^4.17.24",
+    "@types/lodash": "^4.17.25",
     "@types/node": "^26.1.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
@@ -43,7 +43,7 @@
     "vike-react": "^0.6.25",
     "vite": "^8.2.0",
     "vitest": "^4.1.10",
-    "wrangler": "^4.117.0"
+    "wrangler": "^4.118.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
