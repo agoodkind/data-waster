@@ -38,7 +38,7 @@
     "playwright": "^1.62.1",
     "prettier": "3.9.6",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.65.0",
+    "typescript-eslint": "^8.66.0",
     "vike": "^0.4.260",
     "vike-react": "^0.6.25",
     "vite": "^8.2.0",
