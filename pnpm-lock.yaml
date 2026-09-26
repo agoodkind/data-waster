@@ -82,8 +82,8 @@ importers:
         specifier: ^1.63.0
         version: 1.63.0
       prettier:
-        specifier: 3.9.8
-        version: 3.9.8
+        specifier: 3.9.9
+        version: 3.9.9
       typescript:
         specifier: ~5.9.3
         version: 5.9.3
@@ -103,8 +103,8 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.6.2)(@vitest/coverage-v8@4.1.11)(vite@8.3.0(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0))
       wrangler:
-        specifier: ^4.136.2
-        version: 4.136.2(@types/node@26.6.2)
+        specifier: ^4.136.3
+        version: 4.136.3(@types/node@26.6.2)
 
 packages:
 
@@ -2486,8 +2486,8 @@ packages:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
 
-  prettier@3.9.8:
-    resolution: {integrity: sha512-WRFq3Wn3WId7LLROfMLdH7xaFr2jR62wU8nLO6rQUOLOxNZUviyJQs1M0iIhLexSFy+L+w0ch66wtoO2jRjG0A==}
+  prettier@3.9.9:
+    resolution: {integrity: sha512-Z/CJHIkdujO/OtN7nXUii0Rf3VT5SRuhjBA82Xvu2XhBUgX3nhP67T0LHceBdQLex7OOFGTox+Q5Yg8Jk2Qivg==}
     engines: {node: '>=14'}
     hasBin: true
 
@@ -2955,8 +2955,8 @@ packages:
     engines: {node: '>=16'}
     hasBin: true
 
-  wrangler@4.136.2:
-    resolution: {integrity: sha512-BeWkkU7leFyalKi++LDHUaWSumwLVNeBeY2Ma+CqylT/hxs2sKT5e/q88MvXUl4Ng4iPS90H9H1qlb5oK3uhhQ==}
+  wrangler@4.136.3:
+    resolution: {integrity: sha512-L1bS8BI9xoEk3RRr5XoZn5q5k1jCRo8+37ZEEab/jsUFzE1Ea2sIBAbmP1CdwSeD6mZYmnUtR6xpi9esHIl6GA==}
     engines: {node: '>=22.0.0'}
     hasBin: true
     peerDependencies:
@@ -5209,7 +5209,7 @@ snapshots:
 
   prelude-ls@1.2.1: {}
 
-  prettier@3.9.8: {}
+  prettier@3.9.9: {}
 
   prop-types@15.8.1:
     dependencies:
@@ -5795,7 +5795,7 @@ snapshots:
       '@cloudflare/workerd-linux-arm64': 1.20260921.1
       '@cloudflare/workerd-windows-64': 1.20260921.1
 
-  wrangler@4.136.2(@types/node@26.6.2):
+  wrangler@4.136.3(@types/node@26.6.2):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.5.0
       '@cloudflare/unenv-preset': 2.16.2(unenv@2.0.0-rc.24)(workerd@1.20260921.1)
