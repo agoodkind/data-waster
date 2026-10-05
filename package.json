@@ -23,7 +23,7 @@
     "@types/facebook-pixel": "^0.0.31",
     "@types/gtag.js": "^0.0.20",
     "@types/lodash": "^4.17.25",
-    "@types/node": "^26.6.3",
+    "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react-swc": "^4.3.3",
@@ -43,7 +43,7 @@
     "vike-react": "^0.6.29",
     "vite": "^8.3.2",
     "vitest": "^4.1.11",
-    "wrangler": "^4.145.0"
+    "wrangler": "^4.147.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
