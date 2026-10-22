@@ -40,10 +40,10 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.71.2",
     "vike": "^0.4.268",
-    "vike-react": "^0.6.29",
+    "vike-react": "^0.6.30",
     "vite": "^8.3.4",
     "vitest": "^4.1.11",
-    "wrangler": "^4.151.1"
+    "wrangler": "^4.151.2"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
