@@ -43,7 +43,7 @@
     "vike-react": "^0.6.31",
     "vite": "^8.3.5",
     "vitest": "^4.1.11",
-    "wrangler": "^4.151.3"
+    "wrangler": "^4.152.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
