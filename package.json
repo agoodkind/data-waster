@@ -23,7 +23,7 @@
     "@types/facebook-pixel": "^0.0.31",
     "@types/gtag.js": "^0.0.20",
     "@types/lodash": "^4.17.27",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react-swc": "^4.3.3",
@@ -40,10 +40,10 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.72.1",
     "vike": "^0.4.268",
-    "vike-react": "^0.6.31",
+    "vike-react": "^0.6.32",
     "vite": "^8.3.5",
     "vitest": "^4.1.11",
-    "wrangler": "^4.154.0"
+    "wrangler": "^4.155.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
