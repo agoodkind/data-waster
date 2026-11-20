@@ -38,12 +38,12 @@
     "playwright": "^1.65.1",
     "prettier": "3.10.1",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.72.2",
+    "typescript-eslint": "^8.73.0",
     "vike": "^0.4.270",
     "vike-react": "^0.6.32",
     "vite": "^8.3.8",
     "vitest": "^4.1.11",
-    "wrangler": "^4.163.0"
+    "wrangler": "^4.164.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
